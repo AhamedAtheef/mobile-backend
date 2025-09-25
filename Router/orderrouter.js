@@ -5,7 +5,7 @@ import { createOrder, deleteOrder, getOrders, updateOrder } from "../controller/
 const orderRouter = express.Router();
 
 orderRouter.post("/",isAuth,createOrder)
-orderRouter.get("/",isAuth,getOrders)
+orderRouter.get("/:page/:limit",isAuth,getOrders)
 orderRouter.put("/:orderId", isAuth, updateOrder);
 orderRouter.delete("/:orderId", isAuth, deleteOrder);
 

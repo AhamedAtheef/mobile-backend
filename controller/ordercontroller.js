@@ -10,6 +10,7 @@ export async function createOrder(req, res) {
 
         // Find existing products
         const existingProducts = await Product.find({ productid: { $in: productIds } });
+        
 
         // Compare requested IDs vs found IDs
         const existingIds = existingProducts.map(p => p.productid);
@@ -64,16 +65,22 @@ export async function createOrder(req, res) {
 
 
 export async function getOrders(req, res) {
+    const {page,limit} = req.params
     try {
         if (req.user.role == "admin") {
-            const orders = await ORDER.find({});
+            const countorders = await ORDER.countDocuments({});
+            const totalpage = Math.ceil(countorders/limit);
+            const orders = await ORDER.find({}).skip((page-1)*limit).limit(limit);
             res.status(200).json({
                 message: "Orders fetched successfully",
-                orders
+                orders,totalpage
             });
         } else {
-            const orderId = req.body.orderId;
-            const orders = await ORDER.find({ orderId: orderId });
+            const email = req.body.email;
+            const orders = await ORDER.find({ email:email });
+            if(orders.length == 0){
+                return res.status(404).json({ message: "No orders found" });
+            }
             res.status(200).json({
                 message: "Orders fetched successfully",
                 orders

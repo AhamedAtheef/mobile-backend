@@ -159,18 +159,21 @@ export function isAdmin(req) {
     }
 }
 export async function getuser(req, res) {
-    if (isAdmin(req)) {
+    const {page,limit} = req.params
+    if (req.user && req.user.role === "admin") {
         try {
-            const users = await USER.find({}).select("-password");
-            res.json(users)
+            const countProducts = await USER.countDocuments();
+            const totalPages = Math.ceil(countProducts / limit);
+            const users = await USER.find({}).select("-password").skip((page-1) * limit).limit(limit);
+            return res.json({ message: "users fetched successfully", users,totalPages });
         } catch (error) {
-            res.status(500).json({ message: "Failed to fetch users", error: error.message });
+            return res.status(500).json({ message: "Failed to fetch users", error: error.message });
         }
     } else {
         return res.status(403).json({ message: "Access denied. Admins only." });
     }
-
 }
+
 
 export async function myprofile(req, res) {
     try {
@@ -180,4 +183,34 @@ export async function myprofile(req, res) {
         res.status(500).json({ message: "Failed to fetch users", error: error.message });
     }
 
+}
+
+export async function updateuser(req, res) {
+    try {
+        const user = await USER.findOneAndUpdate(
+            { _id: req.params.userid },
+            req.body,
+            { new: true }
+        ).select("-password");
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        return res.json({ user, message: "User updated successfully" });
+    } catch (error) {
+        res.status(500).json({ message: "Failed to update user", error: error.message });
+    }
+}
+
+export async function deleteuser(req, res) {
+    try {
+        const user = await USER.findByIdAndDelete(req.params.userid);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        return res.json({ message: "User deleted successfully" });
+    } catch (error) {
+        res.status(500).json({ message: "Failed to delete user", error: error.message });
+    }
 }
