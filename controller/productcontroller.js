@@ -65,6 +65,16 @@ export async function getproducts(req, res) {
     }
 }
 
+export async function productdetailes(req,res) {
+    const productId = req.params.id
+    try{
+        const product = await Product.findOne({productid:productId})
+        res.json({message:"product fetched successfully",product})
+    }catch(err){
+      res.status(500).json({message:err.message})
+    }
+    
+}
 
 export async function updateproduct(req, res) {
     const productdata = req.body;

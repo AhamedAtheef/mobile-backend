@@ -1,3 +1,4 @@
+import sendMail from "../middleware/sendmail.js";
 import ORDER from "../models/orders.js";
 import Product from "../models/product.js";
 
@@ -10,7 +11,7 @@ export async function createOrder(req, res) {
 
         // Find existing products
         const existingProducts = await Product.find({ productid: { $in: productIds } });
-        
+
 
         // Compare requested IDs vs found IDs
         const existingIds = existingProducts.map(p => p.productid);
@@ -55,6 +56,31 @@ export async function createOrder(req, res) {
             order
         });
 
+        const message = `
+🛒 Your Order Summary
+
+Order ID: ${order.orderId}
+Name: ${order.name}
+Email: ${order.email}
+Phone: ${order.phone}
+Status: ${order.status}
+Total: Rs.${order.totalPrice}
+
+Shipping Address:
+${order.address.street || ""}, ${order.address.city || ""}, ${order.address.zip || ""}
+
+Products:
+${order.products.map((p, i) =>
+            `${i + 1}. Product ID: ${p.productId}  
+   Qty: ${p.quantity}  
+   Image: ${p.productimage}`
+        ).join("\n\n")}
+
+✅ Thanks for shopping with us!
+`;
+
+        await sendMail(email, "Order Summary", message);
+
     } catch (error) {
         res.status(500).json({
             message: "Something went wrong",
@@ -65,36 +91,40 @@ export async function createOrder(req, res) {
 
 
 export async function getOrders(req, res) {
-    const {page,limit} = req.params
     try {
-        if (req.user.role == "admin") {
+        const { page, limit } = req.params;
+
+        if (req.user.role === "admin") {
+            const pageNum = parseInt(page) || 1;
+            const limitNum = parseInt(limit) || 10;
+
             const countorders = await ORDER.countDocuments({});
-            const totalpage = Math.ceil(countorders/limit);
-            const orders = await ORDER.find({}).skip((page-1)*limit).limit(limit);
-            res.status(200).json({
+            const totalpage = Math.ceil(countorders / limitNum);
+
+            const orders = await ORDER.find({})
+                .skip((pageNum - 1) * limitNum)
+                .limit(limitNum);
+
+            return res.status(200).json({
                 message: "Orders fetched successfully",
-                orders,totalpage
+                orders,
+                totalpage,
             });
         } else {
-            const email = req.body.email;
-            const orders = await ORDER.find({ email:email });
-            if(orders.length == 0){
-                return res.status(404).json({ message: "No orders found" });
-            }
-            res.status(200).json({
+            const orders = await ORDER.find({ email: req.user.email });
+            return res.status(200).json({
                 message: "Orders fetched successfully",
-                orders
+                orders,
             });
         }
-    }
-    catch (err) {
+    } catch (err) {
         res.status(500).json({
             message: "Something went wrong",
-            error: err.message
+            error: err.message,
         });
     }
-
 }
+
 
 export async function updateOrder(req, res) {
     try {
@@ -125,10 +155,9 @@ export async function updateOrder(req, res) {
 export async function deleteOrder(req, res) {
     try {
         const { orderId } = req.params;
-
-        // Only admin can delete
-        if (req.user.role?.toLowerCase() !== "admin") {
-            return res.status(403).json({ message: "Access denied. Admins only." });
+        
+        if (req.user === null){
+            return res.status(404).json({ message: "User not found" });
         }
 
         const deletedOrder = await ORDER.findOneAndDelete({ orderId: orderId });

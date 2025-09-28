@@ -6,7 +6,7 @@ import OTP from "../models/otp.js";
 
 
 export async function createuser(req, res) {
-    const { name, email, password, role } = req.body
+    const { name, email, mobile, password, role } = req.body
     try {
         const existinguser = await USER.findOne({ email })
         if (existinguser) {
@@ -17,7 +17,8 @@ export async function createuser(req, res) {
             name,
             email,
             password: passwordhash,
-            role
+            role,
+            mobile
         }
         console.log(userdata)
         const user = new USER(userdata)
@@ -159,13 +160,13 @@ export function isAdmin(req) {
     }
 }
 export async function getuser(req, res) {
-    const {page,limit} = req.params
+    const { page, limit } = req.params
     if (req.user && req.user.role === "admin") {
         try {
             const countProducts = await USER.countDocuments();
             const totalPages = Math.ceil(countProducts / limit);
-            const users = await USER.find({}).select("-password").skip((page-1) * limit).limit(limit);
-            return res.json({ message: "users fetched successfully", users,totalPages });
+            const users = await USER.find({}).select("-password").skip((page - 1) * limit).limit(limit);
+            return res.json({ message: "users fetched successfully", users, totalPages });
         } catch (error) {
             return res.status(500).json({ message: "Failed to fetch users", error: error.message });
         }
@@ -178,11 +179,13 @@ export async function getuser(req, res) {
 export async function myprofile(req, res) {
     try {
         const user = await USER.findOne({ _id: req.user.id }).select("-password");
-        return res.json(user, { message: "user fetched successfully" });
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        return res.json({ user, message: "User fetched successfully" });
     } catch (error) {
-        res.status(500).json({ message: "Failed to fetch users", error: error.message });
+        res.status(500).json({ message: "Failed to fetch user", error: error.message });
     }
-
 }
 
 export async function updateuser(req, res) {
@@ -205,7 +208,7 @@ export async function updateuser(req, res) {
 
 export async function deleteuser(req, res) {
     try {
-        const user = await USER.findByIdAndDelete(req.params.userid);
+        const user = await USER.findByIdAndDelete({_id:req.params.userid});
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
