@@ -3,7 +3,7 @@ import USER from "../models/user.js"
 import jwt from "jsonwebtoken";
 import sendMail from "../middleware/sendmail.js";
 import OTP from "../models/otp.js";
-
+import axios from "axios"
 
 export async function createuser(req, res) {
     const { name, email, mobile, password, role } = req.body
@@ -59,6 +59,51 @@ export async function login(req, res) {
 
 }
 
+export async function googlelogin(req, res) {
+    const googletoken = req.body.token;
+    try {
+        const response = await axios.get("https://www.googleapis.com/oauth2/v3/userinfo", {
+            headers: { Authorization: `Bearer ${googletoken}` }
+        });
+
+        const { email, name, given_name, family_name } = response.data;
+        let user = await USER.findOne({ email });
+
+        if (user) {
+            const token = jwt.sign(
+                { email: user.email, name: user.name, role: user.role, isBlocked: user.isBlocked },
+                process.env.Jwt_Key
+            );
+            return res.json({ token, role: user.role, message: "Login Success" });
+        }
+
+        // create new google user
+        const newuser = new USER({
+            email,
+            name: name || `${given_name} ${family_name}`,
+            role: "user",
+            isBlocked: false,
+            isEmailVerified: true,
+            password: "123456"  // dummy
+        });
+
+        await newuser.save();
+
+        const token = jwt.sign(
+            { email: newuser.email, name: newuser.name, role: newuser.role, isBlocked: newuser.isBlocked },
+            process.env.Jwt_Key
+        );
+
+        return res.json({ token, role: newuser.role, message: "Login Success" });
+
+    } catch (error) {
+        console.error("Google login error:", error.response?.data || error.message);
+        res.status(500).json({
+            message: "Failed to login",
+            error: error.response?.data || error.message
+        });
+    }
+}
 
 export async function generateotp(req, res) {
     const { email } = req.body
@@ -178,7 +223,7 @@ export async function getuser(req, res) {
 
 export async function myprofile(req, res) {
     try {
-        const user = await USER.findOne({ _id: req.user.id }).select("-password");
+        const user = await USER.findOne({ email: req.user.email }).select("-password");
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
@@ -208,7 +253,7 @@ export async function updateuser(req, res) {
 
 export async function deleteuser(req, res) {
     try {
-        const user = await USER.findByIdAndDelete({_id:req.params.userid});
+        const user = await USER.findByIdAndDelete({ _id: req.params.userid });
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
