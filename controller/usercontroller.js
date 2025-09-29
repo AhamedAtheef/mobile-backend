@@ -67,31 +67,38 @@ export async function googlelogin(req, res) {
         });
 
         const { email, name, given_name, family_name } = response.data;
+
+        if (!email) {
+            return res.status(400).json({ message: "Google did not return an email" });
+        }
+
         let user = await USER.findOne({ email });
 
         if (user) {
             const token = jwt.sign(
                 { email: user.email, name: user.name, role: user.role, isBlocked: user.isBlocked },
-                process.env.Jwt_Key
+                process.env.JWT_KEY,
+                { expiresIn: "7d" }
             );
             return res.json({ token, role: user.role, message: "Login Success" });
         }
 
-        // create new google user
+        // create new user
         const newuser = new USER({
             email,
-            name: name || `${given_name} ${family_name}`,
+            name: name || `${given_name || ""} ${family_name || ""}`.trim(),
             role: "user",
             isBlocked: false,
-            isEmailVerified: true,
-            password: "123456"  // dummy
+            isEmailverifyed: true, 
+            password: "123456" // dummy password
         });
 
         await newuser.save();
 
         const token = jwt.sign(
             { email: newuser.email, name: newuser.name, role: newuser.role, isBlocked: newuser.isBlocked },
-            process.env.Jwt_Key
+            process.env.JWT_KEY,
+            { expiresIn: "7d" }
         );
 
         return res.json({ token, role: newuser.role, message: "Login Success" });
@@ -104,6 +111,7 @@ export async function googlelogin(req, res) {
         });
     }
 }
+
 
 export async function generateotp(req, res) {
     const { email } = req.body

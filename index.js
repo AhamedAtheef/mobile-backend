@@ -1,34 +1,57 @@
 import express from "express";
 import dotenv from "dotenv";
-import userRouter from "./Router/userouter.js";
 import mongoose from "mongoose";
-import productRouter from "./Router/productrouter.js";
-import orderRouter from "./Router/orderrouter.js";
 import cors from "cors";
 
+import userRouter from "./Router/userouter.js";
+import productRouter from "./Router/productrouter.js";
+import orderRouter from "./Router/orderrouter.js";
 
 dotenv.config();
-
 
 const app = express();
 const port = process.env.PORT || 5000;
 
+// ✅ Allowed Origins
+const allowedOrigins = [
+    "http://localhost:8080",              // frontend local
+    "https://supercell-city.netlify.app"  // deployed frontend
+];
+
+// ✅ CORS Setup
+app.use(
+    cors({
+        origin: function (origin, callback) {
+            if (!origin) return callback(null, true); // allow Postman/curl
+            if (allowedOrigins.includes(origin)) {
+                return callback(null, true);
+            } else {
+                return callback(new Error("CORS not allowed: " + origin), false);
+            }
+        },
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        credentials: true,
+    })
+);
+
+
 // Middleware
-app.use(cors());
 app.use(express.json());
 
-// routes
+// Routes
 app.use("/api/users", userRouter);
 app.use("/api/products", productRouter);
 app.use("/api/orders", orderRouter);
 
-// Connect to DB first, then start server
-app.listen(port, () => {
-    console.log(`Server is running on http://${port}`);
-});
-
-mongoose.connect(process.env.MONGO_URL).then(()=>{
-    console.log("database connected")
-}).catch(()=>{
-    console.log("failed to connect database")
-})
+// MongoDB + Server
+mongoose
+    .connect(process.env.MONGO_URL)
+    .then(() => {
+        console.log("✅ Database connected");
+        app.listen(port, () => {
+            console.log(`🚀 Server running on http://localhost:${port}`);
+        });
+    })
+    .catch((err) => {
+        console.error("❌ Database connection failed:", err);
+    });
