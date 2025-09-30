@@ -1,28 +1,31 @@
 import { createTransport } from "nodemailer";
 
 const sendMail = async (email, subject, message) => {
-    try {
-        const transport = createTransport({
-            host: "smtp.gmail.com",
-            port: 587,
-            secure: false, // true for 465, false for 587
-            auth: {
-                user: process.env.GMAIL,
-                pass: process.env.PASS, // App Password if Gmail 2FA is on
-            },
-        });
+  try {
+    const transport = createTransport({
+      host: "smtp.gmail.com",
+      port: 587,        
+      secure: false,    
+      requireTLS: true,  
+      auth: {
+        user: process.env.GMAIL, 
+        pass: process.env.PASS,  
+      },
+    });
 
-        await transport.sendMail({
-            from: process.env.GMAIL,
-            to: email,
-            subject: subject,
-            text: message, // ✅ must be "text" or "html"
-        });
+    const info = await transport.sendMail({
+      from: `"Super Cell-city" <${process.env.GMAIL}>`, // sender
+      to: email,       // receiver
+      subject: subject,
+      text: message,   // plain text
+      // html: `<p>${message}</p>` // optional HTML
+    });
 
-        console.log(`✅ Email sent to ${email}`);
-    } catch (error) {
-        console.error("❌ Email failed:", error.message);
-    }
+    console.log("✅ Email sent:", info.messageId);
+  } catch (error) {
+    console.error("❌ Email failed:", error);
+  }
 };
 
 export default sendMail;
+
