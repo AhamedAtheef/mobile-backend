@@ -89,7 +89,7 @@ export async function googlelogin(req, res) {
             name: name || `${given_name || ""} ${family_name || ""}`.trim(),
             role: "user",
             isBlocked: false,
-            isEmailverifyed: true, 
+            isEmailverifyed: true,
             password: "123456" // dummy password
         });
 
@@ -113,53 +113,109 @@ export async function googlelogin(req, res) {
 }
 
 
-export async function generateotp(req, res) {
-    const { email } = req.body
+export async function generateOtp(req, res) {
+    const { email } = req.body;
+
     try {
-        const existinguser = await USER.findOne({ email })
-        if (!existinguser) {
-            return res.status(400).json({ message: "user not found" })
+        console.log("📩 OTP request for:", email);
+
+        const user = await USER.findOne({ email });
+        if (!user) {
+            console.log("❌ No user found");
+            return res.status(400).json({ message: "User not found" });
         }
-        // generate otp 
-        const OTPcode = Math.floor(10000 + Math.random() * 900000);
-        console.log(OTPcode)
 
-        await OTP.deleteMany({ email })
-        await OTP.create({ email, otp: OTPcode })
-        console.log(email, OTPcode)
+        // ✅ Generate 6-digit OTP
+        const otpCode = Math.floor(100000 + Math.random() * 900000);
 
-        const message = `Please Verify Your Account Using OTP Vaide 3 minutes\n YOUR OTP IS :-${OTPcode}`
-        await sendMail(email, "verify your account", message)
-        res.status(200).json({ message: "otp sent successfully" })
+        // ✅ Remove old OTPs
+        await OTP.deleteMany({ email });
 
-    } catch (error) {
-        res.status(500).json({ message: "something went wrong" })
+        // ✅ Save new OTP with expiry
+        await OTP.create({
+            email,
+            otp: otpCode,
+            expiresAt: new Date(Date.now() + 3 * 60 * 1000), // 3 minutes
+        });
+
+        console.log("✅ OTP generated:", otpCode);
+
+        // ✅ Branded Mail
+        const htmlTemplate = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #e0e0e0; border-radius: 10px; padding: 20px; background: #ffffff;">
+        
+        <!-- Header -->
+        <div style="text-align: center; padding-bottom: 15px; border-bottom: 1px solid #ddd;">
+          <img src="/images/logo.png" alt="Super Cell-City" style="max-height: 60px; margin-bottom: 10px;" />
+          <h1 style="color: #4CAF50; margin: 0;">Super Cell-City</h1>
+          <p style="font-size: 14px; color: #777; margin: 5px 0 0;">Secure Verification Service</p>
+        </div>
+
+        <!-- OTP Section -->
+        <div style="padding: 20px; text-align: center;">
+          <p style="font-size: 16px; color: #333;">Hello 👋</p>
+          <p style="font-size: 16px; color: #333;">
+            Please use the OTP below to verify your account:
+          </p>
+          <h2 style="font-size: 32px; color: #4CAF50; margin: 20px 0; letter-spacing: 4px;">
+            ${otpCode}
+          </h2>
+          <p style="font-size: 14px; color: #777;">
+            ⚠️ This code will expire in <b>3 minutes</b>.
+          </p>
+        </div>
+
+        <!-- Footer -->
+        <div style="padding: 15px; text-align: center; background: #f9f9f9; border-top: 1px solid #ddd; font-size: 12px; color: #555;">
+          <p>✅ Sent securely via SendGrid</p>
+          <p>© 2025 Super Cell-City. All Rights Reserved.</p>
+        </div>
+      </div>
+    `;
+
+        // ✅ Use middleware to send mail
+        await sendMail(
+            email,
+            "🔐 Super Cell-City | Your OTP Code (Valid for 3 minutes)",
+            htmlTemplate
+        );
+
+        return res.status(200).json({ message: "OTP sent successfully" });
+    } catch (err) {
+        console.error("❌ Generate OTP error:", err);
+        return res.status(500).json({ message: err.message || "Failed to send OTP" });
     }
-
 }
 
-export async function verifyOTP(req, res) {
+// Verify OTP
+export async function verifyOtp(req, res) {
     const { email, otp } = req.body;
 
     try {
-        // Check if OTP matches email + otp
+        if (!email || !otp) {
+            return res.status(400).json({ message: "Email and OTP are required" });
+        }
+
         const otpRecord = await OTP.findOne({ email, otp });
         if (!otpRecord) {
             return res.status(400).json({ message: "Invalid OTP" });
         }
 
-        // Remove OTP after verification
+        if (otpRecord.expiresAt < Date.now()) {
+            await OTP.deleteOne({ email, otp });
+            return res.status(400).json({ message: "OTP expired" });
+        }
+
         await OTP.deleteOne({ email, otp });
 
-        return res.status(200).json({ message: "OTP verifyed successfully" });
+        return res.status(200).json({ message: "OTP verified successfully" });
     } catch (error) {
-        console.error("Verify OTP error:", error);
-        res.status(500).json({
-            message: "Failed to verify OTP",
-            error: error.message,
-        });
+        console.error("Verify OTP error:", error.message);
+        return res.status(500).json({ message: "Failed to verify OTP" });
     }
 }
+
+
 
 
 export async function resetPassword(req, res) {

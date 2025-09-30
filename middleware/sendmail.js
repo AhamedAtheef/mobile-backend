@@ -1,38 +1,36 @@
-import { createTransport } from "nodemailer";
+import dotenv from "dotenv";
+dotenv.config();
 
-//  Create transport once, with pooling enabled
-const transport = createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,       // use true if port 465
-    requireTLS: true,
-    auth: {
-        user: process.env.GMAIL, // Gmail address
-        pass: process.env.PASS,  // Gmail App Password
-    },
-    pool: true,           // ✅ keep connection alive
-    maxConnections: 5,    // optional - number of parallel connections
-    maxMessages: 100,     // optional - reuse connection for multiple emails
-});
+import sgMail from "@sendgrid/mail";
 
-//  Send mail using the already-opened transport
+// ✅ Ensure API key exists
+if (!process.env.SENDGRID_API_KEY) {
+    throw new Error("🚨 SENDGRID_API_KEY is missing in .env file");
+}
+
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
 const sendMail = async (email, subject, message) => {
     try {
-        const info = await transport.sendMail({
-            from: `"Ecom Shop" <${process.env.GMAIL}>`,
+        const msg = {
             to: email,
+            from: {
+                email: "ahdatheef451@gmail.com", // ✅ verified in SendGrid
+                name: "Super Cell-City Support"
+            },
             subject,
-            text: message,
-        });
+            text: message.replace(/<[^>]+>/g, ""), // plain-text fallback
+            html: message, // HTML
+        };
 
-        console.log(`✅ Email sent to ${email} (ID: ${info.messageId})`);
-        return info;
+        const [response] = await sgMail.send(msg);
+        console.log("✅ Email sent with status:", response.statusCode);
+        return response;
     } catch (error) {
-        console.error("❌ Email failed:", error);
+        console.error("❌ Email error:", error.response?.body || error.message);
         throw error;
     }
 };
 
 export default sendMail;
-
 
