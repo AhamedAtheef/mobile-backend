@@ -49,7 +49,7 @@ export async function login(req, res) {
             role: existinguser.role,
             id: existinguser._id
         }, process.env.JWT_KEY, { expiresIn: "15d" })
-        res.status(200).json({ message: "login successfull", token: token, role: existinguser.role, id: existinguser._id })
+        res.status(200).json({ message: "login successfull", token: token, })
 
     } catch (err) {
         res.status(500).json({ message: "login failed something went wrong" })
@@ -80,7 +80,7 @@ export async function googlelogin(req, res) {
                 process.env.JWT_KEY,
                 { expiresIn: "7d" }
             );
-            return res.json({ token, role: user.role, message: "Login Success" });
+            return res.status(200).json({ message: "login successfull", token: token, })
         }
 
         // create new user
